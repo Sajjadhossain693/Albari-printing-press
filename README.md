@@ -48,7 +48,7 @@ cd ..
 
 ### 4. Run the Development Servers
 ```bash
-# Starts both Express API server (port 5000) and Vite frontend (port 5173) concurrently
+# Starts both Express API server (port 5001) and Vite frontend (port 5173) concurrently
 npm run dev
 ```
 
@@ -56,8 +56,8 @@ Visit the application in your browser:
 - **Client App**: [http://localhost:5173](http://localhost:5173)
 - **Public Storefront**: [http://localhost:5173/storefront](http://localhost:5173/storefront)
 - **Order Tracking**: [http://localhost:5173/track](http://localhost:5173/track)
-- **Backend API**: [http://localhost:5000/api](http://localhost:5000/api)
-- **Health Check**: [http://localhost:5000/health](http://localhost:5000/health)
+- **Backend API**: [http://localhost:5001/api](http://localhost:5001/api)
+- **Health Check**: [http://localhost:5001/health](http://localhost:5001/health)
 
 ---
 
