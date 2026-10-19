@@ -10,8 +10,8 @@ export const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin123');
+  const [username, setUsername] = useState('albari');
+  const [password, setPassword] = useState('taiyan26');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,9 +36,9 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const handleDemoSelect = (u: string, p: string) => {
-    setUsername(u);
-    setPassword(p);
+  const handleAdminSelect = () => {
+    setUsername('albari');
+    setPassword('taiyan26');
   };
 
   return (
@@ -70,7 +70,7 @@ export const LoginPage: React.FC = () => {
         <form onSubmit={handleSubmit} className="p-8 space-y-4 text-xs">
           <div>
             <label className="block font-bold mb-1 text-slate-700 dark:text-slate-300">
-              ইউজারনেম / মোবাইল নম্বর
+              ইউজারনেম / ইমেইল / মোবাইল
             </label>
             <div className="relative">
               <input
@@ -78,6 +78,7 @@ export const LoginPage: React.FC = () => {
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
+                placeholder="যেমন: albari"
                 className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-semibold text-sm"
               />
               <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
@@ -94,6 +95,7 @@ export const LoginPage: React.FC = () => {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                placeholder="পাসওয়ার্ড লিখুন"
                 className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-semibold text-sm"
               />
               <Key className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
@@ -109,41 +111,28 @@ export const LoginPage: React.FC = () => {
             <span>{loading ? 'লগইন হচ্ছে...' : 'লগইন করুন'}</span>
           </button>
 
-          {/* Quick Demo Login Chips */}
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
-            <div className="text-[11px] font-semibold text-slate-400 text-center">
-              এক ক্লিকে ডেমো একাউন্ট নির্বাচন করুন:
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-[10px]">
-              <button
-                type="button"
-                onClick={() => handleDemoSelect('admin', 'admin123')}
-                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold text-slate-700 dark:text-slate-300 text-left"
-              >
-                👑 মালিক (admin)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoSelect('manager', 'manager123')}
-                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold text-slate-700 dark:text-slate-300 text-left"
-              >
-                👔 ম্যানেজার (manager)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoSelect('designer', 'designer123')}
-                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold text-slate-700 dark:text-slate-300 text-left"
-              >
-                🎨 ডিজাইনার (designer)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoSelect('staff', 'staff123')}
-                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold text-slate-700 dark:text-slate-300 text-left"
-              >
-                ⚙️ অপারেটর (staff)
-              </button>
-            </div>
+          {/* Admin Credentials Info & Staff Note */}
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
+            <button
+              type="button"
+              onClick={handleAdminSelect}
+              className="w-full p-2.5 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/30 hover:bg-blue-100/50 transition flex items-center justify-between text-left"
+            >
+              <div>
+                <span className="font-bold text-blue-800 dark:text-blue-300 flex items-center gap-1.5 text-xs">
+                  👑 এডমিন একাউন্ট (Admin)
+                </span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                  ইউজার: <strong className="text-blue-700 dark:text-blue-300">albari</strong> | পাসওয়ার্ড: <strong className="text-blue-700 dark:text-blue-300">taiyan26</strong>
+                </span>
+              </div>
+              <span className="text-[10px] text-blue-600 font-semibold bg-white dark:bg-slate-800 px-2 py-1 rounded-md border border-blue-200 dark:border-blue-800">
+                অটো ফিল
+              </span>
+            </button>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 text-center leading-relaxed">
+              * অন্যান্য সকল স্টাফ (ম্যানেজার, ডিজাইনার, অপারেটর) অ্যাকাউন্ট এডমিন নিজে স্টাফ ও অনুমতি মেনু থেকে তৈরি ও পাসওয়ার্ড নির্ধারণ করবেন।
+            </p>
           </div>
         </form>
       </div>

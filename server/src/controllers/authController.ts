@@ -16,7 +16,8 @@ export async function login(req: Request, res: Response): Promise<void> {
       where: {
         OR: [
           { username: username.trim() },
-          { email: username.trim().toLowerCase() }
+          { email: username.trim().toLowerCase() },
+          { phone: username.trim() }
         ]
       }
     });
@@ -238,3 +239,89 @@ export async function createStaff(req: AuthenticatedRequest, res: Response): Pro
     res.status(500).json({ success: false, message: error.message });
   }
 }
+
+export async function updateStaff(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const { fullName, fullNameBn, role, phone, email, password, active } = req.body;
+
+    const existing = await prisma.user.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ success: false, message: 'স্টাফ অ্যাকাউন্ট পাওয়া যায়নি' });
+      return;
+    }
+
+    const updateData: any = {};
+    if (fullName !== undefined) updateData.fullName = fullName;
+    if (fullNameBn !== undefined) updateData.fullNameBn = fullNameBn;
+    if (role !== undefined) updateData.role = role;
+    if (phone !== undefined) updateData.phone = phone;
+    if (email !== undefined) updateData.email = email;
+    if (active !== undefined) updateData.active = Boolean(active);
+
+    if (password && password.trim()) {
+      const salt = await bcrypt.genSalt(10);
+      updateData.passwordHash = await bcrypt.hash(password.trim(), salt);
+    }
+
+    const updated = await prisma.user.update({
+      where: { id },
+      data: updateData,
+      select: {
+        id: true,
+        username: true,
+        fullName: true,
+        fullNameBn: true,
+        email: true,
+        phone: true,
+        role: true,
+        active: true
+      }
+    });
+
+    res.json({ success: true, user: updated, message: 'স্টাফের তথ্য সফলভাবে হালনাগাদ করা হয়েছে' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+export async function deleteStaff(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    if (id === req.user?.userId) {
+      res.status(400).json({ success: false, message: 'এডমিন নিজের অ্যাকাউন্ট মুছতে পারবেন না' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      res.status(404).json({ success: false, message: 'স্টাফ অ্যাকাউন্ট পাওয়া যায়নি' });
+      return;
+    }
+
+    const relatedOrdersCount = await prisma.order.count({
+      where: {
+        OR: [
+          { createdById: id },
+          { assignedDesignerId: id },
+          { assignedStaffId: id }
+        ]
+      }
+    });
+
+    if (relatedOrdersCount > 0) {
+      // Deactivate instead of hard delete to preserve foreign key history
+      await prisma.user.update({
+        where: { id },
+        data: { active: false }
+      });
+      res.json({ success: true, message: 'স্টাফের পূর্ববর্তী কাজের রেকর্ড থাকায় অ্যাকাউন্টটি নিষ্ক্রিয় (Deactivated) করা হয়েছে' });
+    } else {
+      await prisma.user.delete({ where: { id } });
+      res.json({ success: true, message: 'স্টাফ অ্যাকাউন্ট সফলভাবে মুছে ফেলা হয়েছে' });
+    }
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+

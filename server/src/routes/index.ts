@@ -2,7 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { login, registerCustomer, getMe, getStaffList, createStaff } from '../controllers/authController.js';
+import { login, registerCustomer, getMe, getStaffList, createStaff, updateStaff, deleteStaff } from '../controllers/authController.js';
 import { getOrders, getOrderById, createOrder, updateProductionStatus, updatePaymentStatus, trackOrderPublic } from '../controllers/orderController.js';
 import { getCustomers, getCustomerById, createCustomer, updateCustomer, exportCustomersCsv } from '../controllers/customerController.js';
 import { getProducts, getProductById, createProduct, updateProduct, getCategories } from '../controllers/productController.js';
@@ -61,6 +61,8 @@ router.post('/auth/register', registerCustomer);
 router.get('/auth/me', authenticate, getMe);
 router.get('/auth/staff', authenticate, authorize('OWNER', 'MANAGER'), getStaffList);
 router.post('/auth/staff', authenticate, authorize('OWNER'), createStaff);
+router.put('/auth/staff/:id', authenticate, authorize('OWNER'), updateStaff);
+router.delete('/auth/staff/:id', authenticate, authorize('OWNER'), deleteStaff);
 
 // Public Order Tracking
 router.get('/orders/track', trackOrderPublic);

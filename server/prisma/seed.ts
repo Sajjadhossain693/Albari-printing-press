@@ -32,21 +32,25 @@ async function main() {
   });
 
   // 2. Users & Staff
-  const adminPassword = await bcrypt.hash('admin123', 10);
+  const adminPassword = await bcrypt.hash('taiyan26', 10);
   const managerPassword = await bcrypt.hash('manager123', 10);
   const designerPassword = await bcrypt.hash('designer123', 10);
   const staffPassword = await bcrypt.hash('staff123', 10);
   const customerPassword = await bcrypt.hash('customer123', 10);
 
   const owner = await prisma.user.upsert({
-    where: { username: 'admin' },
-    update: {},
+    where: { username: 'albari' },
+    update: {
+      passwordHash: adminPassword,
+      role: 'OWNER',
+      active: true
+    },
     create: {
-      username: 'admin',
-      email: 'admin@albaripress.com',
+      username: 'albari',
+      email: 'albari@albaripress.com',
       passwordHash: adminPassword,
       fullName: 'Al-Bari Press Owner',
-      fullNameBn: 'মালিক / প্রেস স্বত্বাধিকারী',
+      fullNameBn: 'আল-বারী প্রেস এডমিন',
       phone: '01618182365',
       role: 'OWNER'
     }

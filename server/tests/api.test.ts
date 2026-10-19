@@ -28,8 +28,8 @@ describe('Server API Endpoints', () => {
 
   it('POST /api/auth/login succeeds with valid admin credentials', async () => {
     const res = await request(app).post('/api/auth/login').send({
-      username: 'admin',
-      password: 'admin123'
+      username: 'albari',
+      password: 'taiyan26'
     });
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
@@ -48,8 +48,8 @@ describe('Server API Endpoints', () => {
   it('PUT /api/products/:id updates product base price', async () => {
     // Login to get token
     const loginRes = await request(app).post('/api/auth/login').send({
-      username: 'admin',
-      password: 'admin123'
+      username: 'albari',
+      password: 'taiyan26'
     });
     const token = loginRes.body.token;
 
@@ -73,8 +73,8 @@ describe('Server API Endpoints', () => {
 
   it('PATCH /api/orders/:id/payment-status updates payment status and records payment if due', async () => {
     const loginRes = await request(app).post('/api/auth/login').send({
-      username: 'admin',
-      password: 'admin123'
+      username: 'albari',
+      password: 'taiyan26'
     });
     const token = loginRes.body.token;
 
