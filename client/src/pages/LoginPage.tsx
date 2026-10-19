@@ -1,0 +1,152 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { useAuth } from '../context/AuthContext';
+import { apiRequest } from '../services/api';
+import { Lock, User, Key, CheckCircle2, AlertCircle } from 'lucide-react';
+
+export const LoginPage: React.FC = () => {
+  const { t } = useTranslation();
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  const [username, setUsername] = useState('admin');
+  const [password, setPassword] = useState('admin123');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiRequest('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ username, password })
+      });
+
+      if (res.success && res.token) {
+        login(res.token, res.user);
+        navigate('/');
+      }
+    } catch (err: any) {
+      setError(err.message || 'ইউজারনেম বা পাসওয়ার্ড সঠিক নয়');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDemoSelect = (u: string, p: string) => {
+    setUsername(u);
+    setPassword(p);
+  };
+
+  return (
+    <div className="min-h-[80vh] flex items-center justify-center p-4 font-bangla">
+      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden">
+        
+        {/* Header */}
+        <div className="p-8 pb-6 text-center space-y-2 border-b border-slate-100 dark:border-slate-800">
+          <img
+            src="/assets/albari-logo.jpg"
+            alt="Al-Bari Logo"
+            className="w-16 h-16 rounded-2xl mx-auto object-contain border border-slate-200 p-1 shadow-sm"
+          />
+          <h2 className="text-xl font-black text-slate-900 dark:text-white">
+            আল-বারী প্রেস ম্যানেজমেন্ট
+          </h2>
+          <p className="text-xs text-slate-500">
+            মাইজদী, নোয়াখালী • Al-Bari Press & Digital Sign
+          </p>
+        </div>
+
+        {error && (
+          <div className="mx-8 mt-4 p-3 rounded-xl bg-rose-50 text-xs text-rose-700 border border-rose-200 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="p-8 space-y-4 text-xs">
+          <div>
+            <label className="block font-bold mb-1 text-slate-700 dark:text-slate-300">
+              ইউজারনেম / মোবাইল নম্বর
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-semibold text-sm"
+              />
+              <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block font-bold mb-1 text-slate-700 dark:text-slate-300">
+              পাসওয়ার্ড
+            </label>
+            <div className="relative">
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-semibold text-sm"
+              />
+              <Key className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition text-xs flex items-center justify-center gap-2 mt-2"
+          >
+            <Lock className="w-4 h-4" />
+            <span>{loading ? 'লগইন হচ্ছে...' : 'লগইন করুন'}</span>
+          </button>
+
+          {/* Quick Demo Login Chips */}
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
+            <div className="text-[11px] font-semibold text-slate-400 text-center">
+              এক ক্লিকে ডেমো একাউন্ট নির্বাচন করুন:
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-[10px]">
+              <button
+                type="button"
+                onClick={() => handleDemoSelect('admin', 'admin123')}
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold text-slate-700 dark:text-slate-300 text-left"
+              >
+                👑 মালিক (admin)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoSelect('manager', 'manager123')}
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold text-slate-700 dark:text-slate-300 text-left"
+              >
+                👔 ম্যানেজার (manager)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoSelect('designer', 'designer123')}
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold text-slate-700 dark:text-slate-300 text-left"
+              >
+                🎨 ডিজাইনার (designer)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoSelect('staff', 'staff123')}
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold text-slate-700 dark:text-slate-300 text-left"
+              >
+                ⚙️ অপারেটর (staff)
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};

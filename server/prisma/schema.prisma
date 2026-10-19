@@ -1,0 +1,354 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String    @id @default(uuid())
+  username     String    @unique
+  email        String?   @unique
+  passwordHash String
+  fullName     String
+  fullNameBn   String?
+  phone        String?
+  role         String    @default("STAFF") // OWNER, MANAGER, DESIGNER, STAFF, CUSTOMER
+  active       Boolean   @default(true)
+  avatar       String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  createdOrders     Order[]             @relation("CreatedBy")
+  designerOrders    Order[]             @relation("AssignedDesigner")
+  staffOrders       Order[]             @relation("AssignedStaff")
+  statusChanges     OrderStatusHistory[]
+  receivedPayments  Payment[]
+  expenses          Expense[]
+  designs           DesignAsset[]
+  designRevisions   DesignRevision[]
+  productionJobs    ProductionJob[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+}
+
+model Customer {
+  id                 String   @id @default(uuid())
+  customerCode       String   @unique
+  fullName           String
+  fullNameBn         String?
+  phone              String   @unique
+  email              String?
+  address            String?
+  addressBn          String?
+  customerType       String   @default("INDIVIDUAL") // INDIVIDUAL, BUSINESS, SCHOOL_COLLEGE, UNIVERSITY, ORGANIZATION, RESELLER
+  organizationName   String?
+  organizationNameBn String?
+  notes              String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  orders       Order[]
+  payments     Payment[]
+  invoices     Invoice[]
+  designAssets DesignAsset[]
+}
+
+model ProductCategory {
+  id            String    @id @default(uuid())
+  name          String
+  nameBn        String
+  slug          String    @unique
+  description   String?
+  descriptionBn String?
+  icon          String?
+  sortOrder     Int       @default(0)
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  products Product[]
+}
+
+model Product {
+  id               String          @id @default(uuid())
+  categoryId       String
+  category         ProductCategory @relation(fields: [categoryId], references: [id])
+  name             String
+  nameBn           String
+  slug             String          @unique
+  description      String?
+  descriptionBn    String?
+  basePrice        Float           @default(0)
+  unit             String          @default("PIECE") // PIECE, SET, COPY, PAGE, SQFT, SQM, DOZEN, CUSTOM
+  unitBn           String          @default("টি")
+  availableSizes   String?         // JSON string array e.g. ["A4", "A3", "12x18"]
+  material         String?         // Paper or media types e.g. "Art Card 300gsm"
+  materialBn       String?
+  printingOptions  String?         // Multi-color, single color, 4-color offset, digital
+  finishingOptions String?         // Matte lamination, Spot UV, Foil, Die-cut
+  leadTimeDays     Int             @default(3)
+  imageUrl         String?
+  active           Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  orderItems OrderItem[]
+}
+
+model Order {
+  id                 String      @id @default(uuid())
+  orderNumber        String      @unique // e.g. PR-2026-0001
+  customerId         String
+  customer           Customer    @relation(fields: [customerId], references: [id])
+  createdById        String
+  createdBy          User        @relation("CreatedBy", fields: [createdById], references: [id])
+  assignedDesignerId String?
+  assignedDesigner   User?       @relation("AssignedDesigner", fields: [assignedDesignerId], references: [id])
+  assignedStaffId    String?
+  assignedStaff      User?       @relation("AssignedStaff", fields: [assignedStaffId], references: [id])
+  orderDate          DateTime    @default(now())
+  deliveryDate       DateTime?
+  productionStatus   String      @default("PENDING") // DRAFT, PENDING, CONFIRMED, IN_PRODUCTION, QUALITY_CHECK, READY_FOR_DELIVERY, DELIVERED, CANCELLED
+  paymentStatus      String      @default("UNPAID")  // UNPAID, PARTIALLY_PAID, PAID, REFUNDED, PARTIALLY_REFUNDED
+  priority           String      @default("NORMAL")  // LOW, NORMAL, HIGH, URGENT
+  subtotal           Float       @default(0)
+  discount           Float       @default(0)
+  deliveryCharge     Float       @default(0)
+  additionalCharges  Float       @default(0)
+  totalAmount        Float       @default(0)
+  amountPaid         Float       @default(0)
+  amountDue          Float       @default(0)
+  customerNotes      String?
+  internalNotes      String?
+  trackingToken      String      @unique // Safe secret token for public order tracking
+  designAttachment   String?     // Attached file path / URL
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  items           OrderItem[]
+  statusHistory   OrderStatusHistory[]
+  payments        Payment[]
+  refunds         Refund[]
+  invoices        Invoice[]
+  designAssets    DesignAsset[]
+  productionJobs  ProductionJob[]
+}
+
+model OrderItem {
+  id             String   @id @default(uuid())
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId      String?
+  product        Product? @relation(fields: [productId], references: [id])
+  productName    String
+  productNameBn  String?
+  specifications String?  // Size, paper, lamination, color details
+  quantity       Float    @default(1)
+  unit           String   @default("PIECE")
+  unitBn         String?  @default("টি")
+  unitPrice      Float    @default(0)
+  subtotal       Float    @default(0)
+  notes          String?
+  createdAt      DateTime @default(now())
+}
+
+model OrderStatusHistory {
+  id          String   @id @default(uuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus  String
+  toStatus    String
+  changedById String
+  changedBy   User     @relation(fields: [changedById], references: [id])
+  notes       String?
+  createdAt   DateTime @default(now())
+}
+
+model Payment {
+  id              String   @id @default(uuid())
+  paymentNumber   String   @unique // PAY-2026-0001
+  orderId         String
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+  amount          Float
+  method          String   @default("CASH") // CASH, BKASH, NAGAD, BANK_TRANSFER, CHEQUE, OTHER
+  referenceNumber String?  // TrxID or Cheque No
+  paymentDate     DateTime @default(now())
+  receivedById    String
+  receivedBy      User     @relation(fields: [receivedById], references: [id])
+  notes           String?
+  receiptNumber   String?
+  createdAt       DateTime @default(now())
+
+  refunds Refund[]
+}
+
+model Refund {
+  id            String   @id @default(uuid())
+  refundNumber  String   @unique // REF-2026-0001
+  orderId       String
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentId     String?
+  payment       Payment? @relation(fields: [paymentId], references: [id])
+  amount        Float
+  method        String   @default("CASH")
+  reason        String
+  processedById String
+  createdAt     DateTime @default(now())
+}
+
+model Expense {
+  id                String   @id @default(uuid())
+  expenseNumber     String   @unique // EXP-2026-0001
+  date              DateTime @default(now())
+  category          String   // PAPER_RAW_MATERIALS, INK_TONER, PRINTING_PRODUCTION, STAFF_SALARY, ELECTRICITY, MACHINE_MAINTENANCE, RENT, DELIVERY, PACKAGING, SOFTWARE_INTERNET, OTHER
+  categoryBn        String?
+  amount            Float
+  paymentMethod     String   @default("CASH") // CASH, BKASH, NAGAD, BANK_TRANSFER
+  vendor            String?
+  description       String
+  receiptAttachment String?
+  createdById       String
+  createdBy         User     @relation(fields: [createdById], references: [id])
+  approved          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+}
+
+model Invoice {
+  id                String    @id @default(uuid())
+  invoiceNumber     String    @unique // INV-2026-0001
+  orderId           String
+  order             Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customerId        String
+  customer          Customer  @relation(fields: [customerId], references: [id])
+  issueDate         DateTime  @default(now())
+  dueDate           DateTime?
+  subtotal          Float
+  discount          Float     @default(0)
+  deliveryCharge    Float     @default(0)
+  additionalCharges Float     @default(0)
+  totalAmount       Float
+  amountPaid        Float     @default(0)
+  amountDue         Float     @default(0)
+  paymentStatus     String    @default("UNPAID")
+  termsConditions   String?
+  termsConditionsBn String?
+  createdAt         DateTime  @default(now())
+}
+
+model DesignAsset {
+  id            String    @id @default(uuid())
+  designCode    String    @unique // DSN-2026-0001
+  title         String
+  titleBn       String?
+  category      String    // Logo, Poster, Banner, School or College Crest, Certificate, Visiting Card, etc.
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id])
+  orderId       String?
+  order         Order?    @relation(fields: [orderId], references: [id])
+  designerId    String?
+  designer      User?     @relation(fields: [designerId], references: [id])
+  prompt        String?
+  promptBn      String?
+  referenceFile String?
+  artworkUrl    String
+  revisionNumber Int      @default(1)
+  status        String    @default("DRAFT") // DRAFT, IN_REVIEW, REVISION_REQUESTED, APPROVED, ARCHIVED
+  dimensions    String?   // e.g. "1200x1800", "A4", "3.5x2 inch"
+  colorMode     String?   // "CMYK", "RGB"
+  resolution    String?   // "300 DPI"
+  printSpecs    String?   // e.g. "Bleed 3mm, 4 color offset, gloss lamination"
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  revisions DesignRevision[]
+}
+
+model DesignRevision {
+  id             String      @id @default(uuid())
+  designAssetId  String
+  designAsset    DesignAsset @relation(fields: [designAssetId], references: [id], onDelete: Cascade)
+  revisionNumber Int
+  artworkUrl     String
+  prompt         String?
+  feedback       String?
+  submittedById  String
+  submittedBy    User        @relation(fields: [submittedById], references: [id])
+  createdAt      DateTime    @default(now())
+}
+
+model ProductionJob {
+  id                   String    @id @default(uuid())
+  jobCode              String    @unique // PRD-2026-0001
+  orderId              String
+  order                Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  assignedStaffId      String?
+  assignedStaff        User?     @relation(fields: [assignedStaffId], references: [id])
+  stage                String    @default("ORDER_CONFIRMED") // ORDER_CONFIRMED, DESIGN_PREP, CUSTOMER_APPROVAL, PREPRESS, PRINTING, FINISHING, QUALITY_CHECK, READY_FOR_DELIVERY, DELIVERED
+  stageBn              String?
+  quantityOrdered      Float
+  quantityProduced     Float     @default(0)
+  quantityWasted       Float     @default(0)
+  machineNotes         String?
+  materialRequirements String?
+  qcChecklist          String?   // JSON checklist items
+  startedAt            DateTime?
+  completedAt          DateTime?
+  status               String    @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, ON_HOLD
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  type      String   // ORDER_NEW, ORDER_STATUS, PAYMENT_RECEIVED, DUE_REMINDER, DESIGN_APPROVAL, PRODUCTION_COMPLETED
+  title     String
+  titleBn   String
+  message   String
+  messageBn String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String   // CREATE, UPDATE, DELETE, PAYMENT, REFUND, STATUS_CHANGE
+  entityType String   // ORDER, CUSTOMER, PAYMENT, EXPENSE, DESIGN, INVOICE
+  entityId   String
+  details    String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+}
+
+model BusinessSettings {
+  id               String   @id @default(uuid())
+  name             String   @default("Al-Bari Press & Digital Sign")
+  nameBn           String   @default("ছাপাখানা আল-বারী প্রেস এন্ড ডিজিটাল সাইন")
+  address          String   @default("Mohammadia Hotel Lane, Opposite Hawker's Market, Maijdee, Noakhali")
+  addressBn        String   @default("মাইজদী মোহাম্মদীয়া হোটেলের সংলগ্ন গলি, হকার্স মার্কেটের বিপরীত সাইট, মাইজদী, নোয়াখালী")
+  phone            String   @default("01618-182365")
+  email            String   @default("albariprintingpress@gmail.com")
+  logoUrl          String   @default("/assets/albari-logo.jpg")
+  currencySymbol   String   @default("৳")
+  currencyCode     String   @default("BDT")
+  invoicePrefix    String   @default("INV-2026-")
+  orderPrefix      String   @default("PR-2026-")
+  defaultLanguage  String   @default("bn")
+  timezone         String   @default("Asia/Dhaka")
+  aiProvider       String   @default("gemini-pollinations")
+  aiApiKeyMasked   String?
+  termsBn          String?  @default("১. মালামাল ডেলিভারির সময় ভালভাবে দেখে বুঝে নিন।\n২. ডেলিভারির পর কোন অভিযোগ গ্রহণযোগ্য নয়।\n৩. বাকী টাকা পরিশোধ সাপেক্ষে পণ্য হস্তান্তর করা হবে।")
+  termsEn          String?  @default("1. Please check goods thoroughly upon delivery.\n2. Complaints are not accepted after delivery.\n3. Goods will be released upon full payment of outstanding dues.")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}

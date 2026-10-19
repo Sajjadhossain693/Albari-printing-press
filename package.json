@@ -1,0 +1,17 @@
+{
+  "name": "albari-printing-press-management",
+  "version": "1.0.0",
+  "description": "Complete Printing Press Management & AI Design Platform for Al-Bari Press (আল-বারী প্রেস এন্ড ডিজিটাল সাইন)",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "build": "npm run build --prefix server && npm run build --prefix client",
+    "test": "npm run test --prefix server",
+    "seed": "npm run seed --prefix server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
