@@ -44,4 +44,57 @@ describe('Server API Endpoints', () => {
     expect(res.body.tracking.orderNumber).toBe('PR-2026-0001');
     expect(res.body.tracking.productionStatus).toBe('IN_PRODUCTION');
   });
+
+  it('PUT /api/products/:id updates product base price', async () => {
+    // Login to get token
+    const loginRes = await request(app).post('/api/auth/login').send({
+      username: 'admin',
+      password: 'admin123'
+    });
+    const token = loginRes.body.token;
+
+    // Get a product
+    const prodRes = await request(app).get('/api/products');
+    const firstProduct = prodRes.body.products[0];
+
+    // Update base price
+    const updateRes = await request(app)
+      .put(`/api/products/${firstProduct.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        basePrice: 550,
+        unitBn: 'পিস'
+      });
+
+    expect(updateRes.status).toBe(200);
+    expect(updateRes.body.success).toBe(true);
+    expect(updateRes.body.product.basePrice).toBe(550);
+  });
+
+  it('PATCH /api/orders/:id/payment-status updates payment status and records payment if due', async () => {
+    const loginRes = await request(app).post('/api/auth/login').send({
+      username: 'admin',
+      password: 'admin123'
+    });
+    const token = loginRes.body.token;
+
+    // Get orders
+    const ordersRes = await request(app)
+      .get('/api/orders')
+      .set('Authorization', `Bearer ${token}`);
+    const order = ordersRes.body.orders.find((o: any) => o.amountDue > 0) || ordersRes.body.orders[0];
+
+    const patchRes = await request(app)
+      .patch(`/api/orders/${order.id}/payment-status`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        paymentStatus: 'PAID',
+        method: 'CASH'
+      });
+
+    expect(patchRes.status).toBe(200);
+    expect(patchRes.body.success).toBe(true);
+    expect(patchRes.body.order.paymentStatus).toBe('PAID');
+    expect(patchRes.body.order.amountDue).toBe(0);
+  });
 });

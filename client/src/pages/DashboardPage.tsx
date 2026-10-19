@@ -128,23 +128,23 @@ export const DashboardPage: React.FC = () => {
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard
-          title={t('dashboard.todaySales')}
-          value={formatCurrency(stats.todaySales || 0)}
-          subtitle={`মোট বিক্রয়: ${formatCurrency(stats.totalSales || 0)}`}
+          title="আজকের মোট নগদ আদায়"
+          value={formatCurrency(stats.todayPayments || 0)}
+          subtitle={stats.todayDeliveredCount > 0 ? `ডেলিভারি আদায় সহ (${stats.todayDeliveredCount}টি ডেলিভার্ড)` : "অগ্রিম ও ডেলিভারিতে প্রাপ্ত নগদ"}
           icon={<DollarSign className="w-5 h-5" />}
-          color="blue"
+          color="emerald"
         />
         <StatCard
-          title={t('dashboard.totalPayments')}
-          value={formatCurrency(stats.totalPaymentsReceived || 0)}
-          subtitle="আদায়কৃত নগদ ক্যাশ ও ডিজিটাল পেমেন্ট"
-          icon={<CreditCard className="w-5 h-5" />}
-          color="emerald"
+          title={t('dashboard.todaySales')}
+          value={formatCurrency(stats.todaySales || 0)}
+          subtitle={stats.todayDeliveredSales > 0 ? `আজকের ডেলিভারি: ${formatCurrency(stats.todayDeliveredSales)}` : `মোট বিক্রয়: ${formatCurrency(stats.totalSales || 0)}`}
+          icon={<ShoppingCart className="w-5 h-5" />}
+          color="blue"
         />
         <StatCard
           title={t('dashboard.totalDues')}
           value={formatCurrency(stats.totalOutstandingDue || 0)}
-          subtitle="গ্রাহকদের কাছে মোট বাকী পাওনা"
+          subtitle={`মোট আদায়: ${formatCurrency(stats.totalPaymentsReceived || 0)}`}
           icon={<AlertTriangle className="w-5 h-5" />}
           color="rose"
         />

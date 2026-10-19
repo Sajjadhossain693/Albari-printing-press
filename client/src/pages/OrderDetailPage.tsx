@@ -17,7 +17,9 @@ import {
   Layers,
   FileText,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Truck,
+  X
 } from 'lucide-react';
 
 export const OrderDetailPage: React.FC = () => {
@@ -31,6 +33,17 @@ export const OrderDetailPage: React.FC = () => {
 
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+
+  // Delivery confirmation modal with payment collection
+  const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
+  const [deliveryCollectDue, setDeliveryCollectDue] = useState(true);
+  const [deliveryPaymentMethod, setDeliveryPaymentMethod] = useState('CASH');
+  const [updatingDelivery, setUpdatingDelivery] = useState(false);
+
+  // Quick Mark as Paid modal
+  const [isQuickPayModalOpen, setIsQuickPayModalOpen] = useState(false);
+  const [quickPayMethod, setQuickPayMethod] = useState('CASH');
+  const [updatingQuickPay, setUpdatingQuickPay] = useState(false);
 
   const fetchOrderDetail = async () => {
     setLoading(true);
@@ -49,6 +62,102 @@ export const OrderDetailPage: React.FC = () => {
       fetchOrderDetail();
     }
   }, [id]);
+
+  const handleProductionStatusChange = async (newStatus: string) => {
+    if (!order) return;
+    if (newStatus === 'DELIVERED' && order.amountDue > 0) {
+      setIsDeliveryModalOpen(true);
+      setDeliveryCollectDue(true);
+      setDeliveryPaymentMethod('CASH');
+      return;
+    }
+    try {
+      await apiRequest(`/orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: newStatus })
+      });
+      fetchOrderDetail();
+    } catch (err: any) {
+      alert(err.message || 'স্ট্যাটাস আপডেট ব্যর্থ হয়েছে');
+    }
+  };
+
+  const handleDeliveryConfirmSubmit = async () => {
+    if (!order) return;
+    setUpdatingDelivery(true);
+    try {
+      await apiRequest(`/orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'DELIVERED',
+          collectRemainingPayment: deliveryCollectDue,
+          paymentMethod: deliveryPaymentMethod,
+          paymentAmount: deliveryCollectDue ? order.amountDue : 0,
+          notes: deliveryCollectDue
+            ? `ডেলিভারির সময় বকেয়া ৳${order.amountDue} আদায় সম্পন্ন এবং আজকের হিসাবে যোগ করা হয়েছে`
+            : 'ডেলিভারি সম্পন্ন (বকেয়া অপরিশোধিত)'
+        })
+      });
+      setIsDeliveryModalOpen(false);
+      fetchOrderDetail();
+    } catch (err: any) {
+      alert(err.message || 'ডেলিভারি স্ট্যাটাস আপডেট ব্যর্থ হয়েছে');
+    } finally {
+      setUpdatingDelivery(false);
+    }
+  };
+
+  const handlePaymentStatusChange = async (newStatus: string) => {
+    if (!order) return;
+    if (newStatus === 'PAID') {
+      if (order.amountDue > 0) {
+        setIsQuickPayModalOpen(true);
+        setQuickPayMethod('CASH');
+      } else {
+        executePaymentStatusUpdate('PAID');
+      }
+    } else if (newStatus === 'PARTIALLY_PAID') {
+      setIsPaymentModalOpen(true);
+    } else if (newStatus === 'UNPAID') {
+      if (window.confirm('অর্ডারটি অপরিশোধিত (UNPAID) করতে চান?')) {
+        executePaymentStatusUpdate('UNPAID');
+      }
+    }
+  };
+
+  const executePaymentStatusUpdate = async (paymentStatus: string, method?: string) => {
+    if (!order) return;
+    try {
+      await apiRequest(`/orders/${order.id}/payment-status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ paymentStatus, method: method || 'CASH' })
+      });
+      fetchOrderDetail();
+    } catch (err: any) {
+      alert(err.message || 'পেমেন্ট স্ট্যাটাস পরিবর্তন ব্যর্থ হয়েছে');
+    }
+  };
+
+  const handleQuickPaySubmit = async () => {
+    if (!order) return;
+    setUpdatingQuickPay(true);
+    try {
+      await apiRequest(`/orders/${order.id}/payment-status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          paymentStatus: 'PAID',
+          method: quickPayMethod,
+          amount: order.amountDue
+        })
+      });
+      setIsQuickPayModalOpen(false);
+      fetchOrderDetail();
+    } catch (err: any) {
+      alert(err.message || 'পেমেন্ট স্ট্যাটাস আপডেট ব্যর্থ হয়েছে');
+    } finally {
+      setUpdatingQuickPay(false);
+    }
+  };
 
   if (loading) {
     return <div className="p-8 text-center text-slate-500">লোড হচ্ছে...</div>;
@@ -78,12 +187,39 @@ export const OrderDetailPage: React.FC = () => {
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono">
                 {order.orderNumber}
               </h1>
-              <StatusBadge type="production" status={order.productionStatus} />
-              <StatusBadge type="payment" status={order.paymentStatus} />
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                <StatusBadge type="production" status={order.productionStatus} />
+                <select
+                  value={order.productionStatus}
+                  onChange={(e) => handleProductionStatusChange(e.target.value)}
+                  className="text-xs p-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-semibold cursor-pointer"
+                  title="উৎপাদন স্ট্যাটাস পরিবর্তন"
+                >
+                  <option value="PENDING">পেন্ডিং</option>
+                  <option value="IN_PRODUCTION">উৎপাদন</option>
+                  <option value="QUALITY_CHECK">মান যাচাই</option>
+                  <option value="READY_FOR_DELIVERY">প্রস্তুত</option>
+                  <option value="DELIVERED">ডেলিভার্ড</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                <StatusBadge type="payment" status={order.paymentStatus} />
+                <select
+                  value={order.paymentStatus}
+                  onChange={(e) => handlePaymentStatusChange(e.target.value)}
+                  className="text-xs p-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-semibold cursor-pointer"
+                  title="পেমেন্ট স্ট্যাটাস পরিবর্তন"
+                >
+                  <option value="UNPAID">অপরিশোধিত</option>
+                  <option value="PARTIALLY_PAID">আংশিক</option>
+                  <option value="PAID">পরিশোধিত</option>
+                </select>
+              </div>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               অর্ডারের তারিখ: {formatDate(order.orderDate)}
@@ -313,6 +449,185 @@ export const OrderDetailPage: React.FC = () => {
           order={order}
           onClose={() => setIsPrintModalOpen(false)}
         />
+      )}
+
+      {/* Delivery & Today's Account Collection Modal */}
+      {isDeliveryModalOpen && order && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex justify-center p-4">
+          <div className="relative w-full max-w-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 bg-emerald-50/70 dark:bg-emerald-950/40">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-emerald-600 text-white">
+                  <Truck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">অর্ডার ডেলিভারি ও আজকের হিসাব</h3>
+                  <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">ডেলিভারি সম্পন্ন ও বকেয়া পাওনা আদায়</p>
+                </div>
+              </div>
+              <button onClick={() => setIsDeliveryModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">অর্ডার নম্বর:</span>
+                  <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{order.orderNumber}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">গ্রাহকের নাম:</span>
+                  <span className="font-semibold">{order.customer.fullName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">মোট বিল:</span>
+                  <span className="font-semibold">{formatCurrency(order.totalAmount)}</span>
+                </div>
+                <div className="flex justify-between text-rose-600 font-bold border-t border-slate-200 dark:border-slate-700 pt-1.5">
+                  <span>বকেয়া টাকা:</span>
+                  <span>{formatCurrency(order.amountDue)}</span>
+                </div>
+              </div>
+
+              {/* Delivery Due Payment Option */}
+              <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 space-y-3">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={deliveryCollectDue}
+                    onChange={(e) => setDeliveryCollectDue(e.target.checked)}
+                    className="w-4 h-4 mt-0.5 rounded text-blue-600 focus:ring-blue-500"
+                  />
+                  <div className="text-xs">
+                    <span className="font-bold text-slate-900 dark:text-slate-100 block">
+                      বকেয়া {formatCurrency(order.amountDue)} আদায় হয়েছে (আজকের হিসাবে যোগ করুন)
+                    </span>
+                    <span className="text-[11px] text-slate-500 leading-normal block mt-0.5">
+                      যেদিন ডেলিভারি সম্পন্ন হবে, ওই দিন প্রাপ্ত টাকা আজকের নগদ আদায়ে যোগ হয়ে ক্যাশ হিসাব হালনাগাদ হবে।
+                    </span>
+                  </div>
+                </label>
+
+                {deliveryCollectDue && (
+                  <div className="pt-2 border-t border-amber-200/60 dark:border-amber-900/40">
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      পেমেন্ট মেথড নির্বাচন করুন:
+                    </label>
+                    <select
+                      value={deliveryPaymentMethod}
+                      onChange={(e) => setDeliveryPaymentMethod(e.target.value)}
+                      className="w-full text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+                    >
+                      <option value="CASH">নগদ (Cash)</option>
+                      <option value="BKASH">বিকাশ (bKash)</option>
+                      <option value="NAGAD">নগদ (Nagad)</option>
+                      <option value="ROCKET">রকেট (Rocket)</option>
+                      <option value="BANK_TRANSFER">ব্যাংক ট্রান্সফার</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDeliveryModalOpen(false)}
+                  className="px-3.5 py-2 text-xs font-semibold rounded-lg border border-slate-300 hover:bg-slate-100 transition"
+                >
+                  {t('app.cancel')}
+                </button>
+                <button
+                  type="button"
+                  disabled={updatingDelivery}
+                  onClick={handleDeliveryConfirmSubmit}
+                  className="px-4 py-2 text-xs font-semibold rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 transition flex items-center gap-1.5 shadow-sm"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>
+                    {updatingDelivery
+                      ? t('app.loading')
+                      : deliveryCollectDue
+                      ? 'টাকা আদায় সহ ডেলিভারি সম্পন্ন করুন'
+                      : 'বকেয়া রেখে ডেলিভারি করুন'}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Mark As Paid Modal */}
+      {isQuickPayModalOpen && order && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex justify-center p-4">
+          <div className="relative w-full max-w-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-blue-600 text-white">
+                  <CreditCard className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">সম্পূর্ণ পরিশোধিত চিহ্নিত করুন</h3>
+                  <p className="text-xs text-slate-500">বকেয়া নিষ্পত্তি ও আজকের হিসাবে যোগ</p>
+                </div>
+              </div>
+              <button onClick={() => setIsQuickPayModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3.5 text-xs">
+              <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 space-y-1">
+                <div className="flex justify-between font-mono font-bold text-blue-600 dark:text-blue-400">
+                  <span>অর্ডার নং:</span>
+                  <span>{order.orderNumber}</span>
+                </div>
+                <div className="flex justify-between font-bold text-slate-900 dark:text-white">
+                  <span>বকেয়া নিষ্পত্তির পরিমাণ:</span>
+                  <span className="text-emerald-600 text-sm">{formatCurrency(order.amountDue)}</span>
+                </div>
+                <div className="text-[11px] text-slate-500 mt-1">
+                  এই টাকা আজকের নগদ আদায়ের হিসাবে অবিলম্বে যুক্ত হবে।
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1">পেমেন্ট মেথড *</label>
+                <select
+                  value={quickPayMethod}
+                  onChange={(e) => setQuickPayMethod(e.target.value)}
+                  className="w-full text-xs p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+                >
+                  <option value="CASH">নগদ (Cash)</option>
+                  <option value="BKASH">বিকাশ (bKash)</option>
+                  <option value="NAGAD">নগদ (Nagad)</option>
+                  <option value="ROCKET">রকেট (Rocket)</option>
+                  <option value="BANK_TRANSFER">ব্যাংক ট্রান্সফার</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsQuickPayModalOpen(false)}
+                  className="px-3.5 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100 transition"
+                >
+                  {t('app.cancel')}
+                </button>
+                <button
+                  type="button"
+                  disabled={updatingQuickPay}
+                  onClick={handleQuickPaySubmit}
+                  className="px-4 py-1.5 rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition flex items-center gap-1.5 font-semibold shadow-sm"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{updatingQuickPay ? t('app.loading') : 'পরিশোধ সম্পন্ন করুন'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -11,7 +11,8 @@ import {
   Tag,
   CheckCircle2,
   X,
-  FileText
+  FileText,
+  Edit3
 } from 'lucide-react';
 
 export const ProductsPage: React.FC = () => {
@@ -38,6 +39,17 @@ export const ProductsPage: React.FC = () => {
   const [imageUrl, setImageUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Edit / Change Price Modal
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editPrice, setEditPrice] = useState('');
+  const [editUnitBn, setEditUnitBn] = useState('টি');
+  const [editNameBn, setEditNameBn] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editMaterialBn, setEditMaterialBn] = useState('');
+  const [editLeadTimeDays, setEditLeadTimeDays] = useState('3');
+  const [editDescriptionBn, setEditDescriptionBn] = useState('');
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -103,6 +115,48 @@ export const ProductsPage: React.FC = () => {
       fetchProducts();
     } catch (err: any) {
       setError(err.message || 'পণ্য যোগ করতে ব্যর্থ হয়েছে');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const openEditModal = (product: Product) => {
+    setEditingProduct(product);
+    setEditPrice(String(product.basePrice || ''));
+    setEditUnitBn(product.unitBn || 'টি');
+    setEditNameBn(product.nameBn || '');
+    setEditName(product.name || '');
+    setEditMaterialBn(product.materialBn || '');
+    setEditLeadTimeDays(String(product.leadTimeDays || '3'));
+    setEditDescriptionBn(product.descriptionBn || product.description || '');
+    setError(null);
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      await apiRequest(`/products/${editingProduct.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: editName,
+          nameBn: editNameBn,
+          basePrice: parseFloat(editPrice) || 0,
+          unitBn: editUnitBn,
+          materialBn: editMaterialBn,
+          leadTimeDays: parseInt(editLeadTimeDays, 10) || 3,
+          descriptionBn: editDescriptionBn
+        })
+      });
+
+      setIsEditModalOpen(false);
+      setEditingProduct(null);
+      fetchProducts();
+    } catch (err: any) {
+      setError(err.message || 'পণ্যের দর ও তথ্য আপডেট করতে ব্যর্থ হয়েছে');
     } finally {
       setSubmitting(false);
     }
@@ -197,13 +251,23 @@ export const ProductsPage: React.FC = () => {
                   <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-slate-900/80 backdrop-blur-sm text-white text-[10px] font-semibold">
                     {product.category?.nameBn || 'ছাপাখানা'}
                   </div>
+                  <button
+                    onClick={() => openEditModal(product)}
+                    className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-white/95 dark:bg-slate-900/95 hover:bg-white text-slate-800 dark:text-slate-100 text-[11px] font-bold flex items-center gap-1 shadow-md hover:scale-105 transition"
+                    title="দর ও তথ্য পরিবর্তন করুন"
+                  >
+                    <Edit3 className="w-3 h-3 text-blue-600" />
+                    <span>দর পরিবর্তন</span>
+                  </button>
                 </div>
 
                 {/* Content */}
                 <div className="p-4 space-y-2">
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-1">
-                    {product.nameBn}
-                  </h3>
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-1">
+                      {product.nameBn}
+                    </h3>
+                  </div>
                   <div className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
                     {product.descriptionBn || product.description}
                   </div>
@@ -219,10 +283,17 @@ export const ProductsPage: React.FC = () => {
               {/* Price & Lead Time Footer */}
               <div className="p-4 pt-0 border-t border-slate-100 dark:border-slate-800 mt-2 flex items-center justify-between text-xs">
                 <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-semibold">মূল্য</div>
-                  <div className="text-sm font-black text-blue-600 dark:text-blue-400">
-                    {formatCurrency(product.basePrice)} <span className="text-[10px] font-normal text-slate-500">/ {product.unitBn}</span>
-                  </div>
+                  <div className="text-[10px] text-slate-400 uppercase font-semibold">মূল্য (একক)</div>
+                  <button
+                    onClick={() => openEditModal(product)}
+                    className="group flex items-center gap-1 text-left"
+                    title="মূল্য পরিবর্তন করতে ক্লিক করুন"
+                  >
+                    <span className="text-sm font-black text-blue-600 dark:text-blue-400 group-hover:underline">
+                      {formatCurrency(product.basePrice)} <span className="text-[10px] font-normal text-slate-500">/ {product.unitBn}</span>
+                    </span>
+                    <Edit3 className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition" />
+                  </button>
                 </div>
                 <div className="flex items-center gap-1 text-[11px] text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">
                   <Clock className="w-3.5 h-3.5 text-slate-400" />
@@ -370,6 +441,140 @@ export const ProductsPage: React.FC = () => {
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   <span>{submitting ? t('app.loading') : 'পণ্য যোগ করুন'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Product / Change Price Modal */}
+      {isEditModalOpen && editingProduct && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex justify-center p-4">
+          <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 my-auto overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-emerald-600 text-white">
+                  <Tag className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold leading-tight">পণ্যের দর ও বিবরণ পরিবর্তন</h3>
+                  <p className="text-xs text-slate-500">মূল্য ও স্পেসিফিকেশন আপডেট করুন</p>
+                </div>
+              </div>
+              <button onClick={() => setIsEditModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {error && (
+              <div className="mx-6 mt-4 p-3 rounded-lg bg-rose-50 text-xs text-rose-700 border border-rose-200">
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleEditSubmit} className="p-5 space-y-3.5">
+              {/* Highlighted Price Input Card */}
+              <div className="p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
+                    <Tag className="w-4 h-4 text-blue-600" />
+                    <span>পণ্যের একক মূল্য (৳ দর) *</span>
+                  </label>
+                  <span className="text-[10px] text-blue-600 font-semibold bg-blue-100 dark:bg-blue-900/50 px-2 py-0.5 rounded">
+                    বর্তমান: {formatCurrency(editingProduct.basePrice)} / {editingProduct.unitBn}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-2.5 text-sm font-bold text-slate-400">৳</span>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      required
+                      value={editPrice}
+                      onChange={(e) => setEditPrice(e.target.value)}
+                      placeholder="নতুন দর"
+                      className="w-full text-base font-black pl-8 pr-3 py-2 rounded-lg border-2 border-blue-500 bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="w-28">
+                    <input
+                      type="text"
+                      required
+                      value={editUnitBn}
+                      onChange={(e) => setEditUnitBn(e.target.value)}
+                      placeholder="একক (টি/কপি)"
+                      className="w-full text-xs py-2.5 px-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-center font-semibold"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold mb-1">পণ্যের নাম (বাংলা) *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editNameBn}
+                    onChange={(e) => setEditNameBn(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1">ডেলিভারির সময় (দিন)</label>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min="1"
+                      value={editLeadTimeDays}
+                      onChange={(e) => setEditLeadTimeDays(e.target.value)}
+                      className="w-full text-xs p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+                    />
+                    <span className="text-xs text-slate-500">দিন</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1">কাগজ / মেটেরিয়াল স্পেসিফিকেশন</label>
+                <input
+                  type="text"
+                  value={editMaterialBn}
+                  onChange={(e) => setEditMaterialBn(e.target.value)}
+                  placeholder="যেমন: ৩০০ জিএসএম আর্ট কার্ড, ম্যাট ল্যামিনেশন"
+                  className="w-full text-xs p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1">সংক্ষিপ্ত বিবরণ</label>
+                <textarea
+                  rows={2}
+                  value={editDescriptionBn}
+                  onChange={(e) => setEditDescriptionBn(e.target.value)}
+                  placeholder="পণ্য সম্পর্কে বিস্তারিত তথ্য..."
+                  className="w-full text-xs p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold rounded-lg border border-slate-300 hover:bg-slate-100 transition"
+                >
+                  {t('app.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-5 py-2 text-xs font-semibold rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 transition flex items-center gap-1.5 shadow-sm"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{submitting ? t('app.loading') : 'দর ও তথ্য সেভ করুন'}</span>
                 </button>
               </div>
             </form>

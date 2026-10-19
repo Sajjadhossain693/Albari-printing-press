@@ -41,7 +41,8 @@ export async function getDashboardStats(req: AuthenticatedRequest, res: Response
       upcomingDeadlines,
       recentPayments,
       orderItems,
-      allOrders
+      allOrders,
+      todayDeliveredOrders
     ] = await Promise.all([
       prisma.order.count({ where: { orderDate: { gte: todayStart } } }),
       prisma.order.count({ where: { orderDate: { gte: startDate, lte: now } } }),
@@ -91,6 +92,18 @@ export async function getDashboardStats(req: AuthenticatedRequest, res: Response
       prisma.order.findMany({
         where: { orderDate: { gte: startDate, lte: now } },
         select: { totalAmount: true, amountPaid: true, amountDue: true, productionStatus: true, orderDate: true }
+      }),
+      prisma.order.findMany({
+        where: {
+          OR: [
+            { deliveredAt: { gte: todayStart } },
+            {
+              productionStatus: 'DELIVERED',
+              updatedAt: { gte: todayStart }
+            }
+          ]
+        },
+        select: { id: true, totalAmount: true, amountPaid: true, amountDue: true }
       })
     ]);
 
@@ -102,6 +115,7 @@ export async function getDashboardStats(req: AuthenticatedRequest, res: Response
     const todaySales = allOrders
       .filter(o => new Date(o.orderDate) >= todayStart)
       .reduce((acc, o) => acc + o.totalAmount, 0);
+    const todayDeliveredSales = todayDeliveredOrders.reduce((acc: number, o: any) => acc + o.totalAmount, 0);
 
     // Group Top Products
     const productStats: Record<string, { name: string; nameBn: string; count: number; revenue: number }> = {};
@@ -159,6 +173,8 @@ export async function getDashboardStats(req: AuthenticatedRequest, res: Response
         inProduction: inProductionCount,
         readyForDelivery: readyDeliveryCount,
         deliveredOrders: deliveredCount,
+        todayDeliveredSales,
+        todayDeliveredCount: todayDeliveredOrders.length,
         todaySales,
         todayPayments: todayPaymentsSum._sum.amount || 0,
         totalSales,

@@ -111,6 +111,7 @@ model Order {
   assignedStaff      User?       @relation("AssignedStaff", fields: [assignedStaffId], references: [id])
   orderDate          DateTime    @default(now())
   deliveryDate       DateTime?
+  deliveredAt        DateTime?   // Actual date & time when the order was handed over/delivered
   productionStatus   String      @default("PENDING") // DRAFT, PENDING, CONFIRMED, IN_PRODUCTION, QUALITY_CHECK, READY_FOR_DELIVERY, DELIVERED, CANCELLED
   paymentStatus      String      @default("UNPAID")  // UNPAID, PARTIALLY_PAID, PAID, REFUNDED, PARTIALLY_REFUNDED
   priority           String      @default("NORMAL")  // LOW, NORMAL, HIGH, URGENT

@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { login, registerCustomer, getMe, getStaffList, createStaff } from '../controllers/authController.js';
-import { getOrders, getOrderById, createOrder, updateProductionStatus, trackOrderPublic } from '../controllers/orderController.js';
+import { getOrders, getOrderById, createOrder, updateProductionStatus, updatePaymentStatus, trackOrderPublic } from '../controllers/orderController.js';
 import { getCustomers, getCustomerById, createCustomer, updateCustomer, exportCustomersCsv } from '../controllers/customerController.js';
 import { getProducts, getProductById, createProduct, updateProduct, getCategories } from '../controllers/productController.js';
 import { getPayments, recordPayment, processRefund } from '../controllers/paymentController.js';
@@ -70,6 +70,7 @@ router.get('/orders', authenticate, getOrders);
 router.get('/orders/:id', authenticate, getOrderById);
 router.post('/orders', authenticate, createOrder);
 router.patch('/orders/:id/status', authenticate, authorize('OWNER', 'MANAGER', 'STAFF'), updateProductionStatus);
+router.patch('/orders/:id/payment-status', authenticate, authorize('OWNER', 'MANAGER'), updatePaymentStatus);
 
 // Public Guest Order Submission (from website storefront)
 router.post('/public/orders', createOrder);

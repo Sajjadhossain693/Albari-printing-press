@@ -307,32 +307,205 @@ export async function createOrder(req: AuthenticatedRequest, res: Response): Pro
 export async function updateProductionStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const id = String(req.params.id);
-    const { status, notes } = req.body;
+    const { status, notes, collectRemainingPayment, paymentMethod, paymentAmount, referenceNumber } = req.body;
 
-    const order = await prisma.order.findUnique({ where: { id } });
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: { customer: true }
+    });
     if (!order) {
       res.status(404).json({ success: false, message: 'Order not found' });
       return;
     }
 
     const previousStatus = order.productionStatus;
-    const updated = await prisma.order.update({
-      where: { id },
-      data: {
-        productionStatus: status
+    const isNowDelivered = status === 'DELIVERED';
+    const userId = req.user?.userId || (await prisma.user.findFirst())?.id || 'system';
+
+    let amountCollected = 0;
+    if (isNowDelivered && (collectRemainingPayment || paymentAmount > 0)) {
+      amountCollected = paymentAmount !== undefined ? parseFloat(paymentAmount) : order.amountDue;
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      let newAmountPaid = order.amountPaid;
+      let newAmountDue = order.amountDue;
+      let newPaymentStatus = order.paymentStatus;
+
+      // If money collected upon delivery, record payment for today's delivery date
+      if (amountCollected > 0) {
+        newAmountPaid = order.amountPaid + amountCollected;
+        newAmountDue = Math.max(0, order.totalAmount - newAmountPaid);
+        newPaymentStatus = determinePaymentStatus(order.totalAmount, newAmountPaid);
+
+        const payCount = await tx.payment.count();
+        const paymentNumber = generateCode('PAY', payCount + 1);
+        const receiptNumber = generateCode('RCT', payCount + 1);
+
+        await tx.payment.create({
+          data: {
+            paymentNumber,
+            receiptNumber,
+            orderId: order.id,
+            customerId: order.customerId,
+            amount: amountCollected,
+            method: paymentMethod || 'CASH',
+            referenceNumber: referenceNumber || `Delivery Collection for ${order.orderNumber}`,
+            receivedById: userId,
+            notes: 'Collected upon delivery - credited to delivery date accounts',
+            paymentDate: new Date()
+          }
+        });
+
+        await tx.auditLog.create({
+          data: {
+            userId,
+            action: 'PAYMENT',
+            entityType: 'PAYMENT',
+            entityId: paymentNumber,
+            details: `Collected ৳${amountCollected} on delivery for order ${order.orderNumber}`
+          }
+        });
       }
+
+      const orderUpdated = await tx.order.update({
+        where: { id },
+        data: {
+          productionStatus: status,
+          deliveredAt: isNowDelivered ? (order.deliveredAt || new Date()) : (status === 'CANCELLED' ? null : order.deliveredAt),
+          amountPaid: newAmountPaid,
+          amountDue: newAmountDue,
+          paymentStatus: newPaymentStatus
+        },
+        include: {
+          customer: true,
+          items: true,
+          payments: true
+        }
+      });
+
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: id,
+          fromStatus: previousStatus,
+          toStatus: status,
+          changedById: userId,
+          notes: notes || (isNowDelivered && amountCollected > 0
+            ? `Delivered & collected remaining ৳${amountCollected}`
+            : `Production status changed to ${status}`)
+        }
+      });
+
+      return orderUpdated;
     });
+
+    res.json({ success: true, order: updated });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+export async function updatePaymentStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const id = String(req.params.id);
+    const { paymentStatus, method = 'CASH', amount, referenceNumber, notes } = req.body;
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: { customer: true, payments: true }
+    });
+
+    if (!order) {
+      res.status(404).json({ success: false, message: 'Order not found' });
+      return;
+    }
 
     const userId = req.user?.userId || (await prisma.user.findFirst())?.id || 'system';
 
-    await prisma.orderStatusHistory.create({
-      data: {
-        orderId: id,
-        fromStatus: previousStatus,
-        toStatus: status,
-        changedById: userId,
-        notes: notes || `Production status changed to ${status}`
+    const updated = await prisma.$transaction(async (tx) => {
+      let newAmountPaid = order.amountPaid;
+      let newAmountDue = order.amountDue;
+      const targetStatus = paymentStatus;
+
+      if (targetStatus === 'PAID') {
+        // If there is outstanding due, record settlement payment for today's accounts
+        const dueToPay = amount !== undefined ? parseFloat(amount) : order.amountDue;
+        if (dueToPay > 0) {
+          newAmountPaid = order.amountPaid + dueToPay;
+          newAmountDue = Math.max(0, order.totalAmount - newAmountPaid);
+
+          const payCount = await tx.payment.count();
+          const paymentNumber = generateCode('PAY', payCount + 1);
+          const receiptNumber = generateCode('RCT', payCount + 1);
+
+          await tx.payment.create({
+            data: {
+              paymentNumber,
+              receiptNumber,
+              orderId: order.id,
+              customerId: order.customerId,
+              amount: dueToPay,
+              method: method || 'CASH',
+              referenceNumber: referenceNumber || `Settlement for ${order.orderNumber}`,
+              receivedById: userId,
+              notes: notes || 'Marked as Paid - settlement payment recorded in today accounts',
+              paymentDate: new Date()
+            }
+          });
+        }
+      } else if (targetStatus === 'PARTIALLY_PAID') {
+        const partialAmount = parseFloat(amount);
+        if (!isNaN(partialAmount) && partialAmount > 0) {
+          newAmountPaid = order.amountPaid + partialAmount;
+          newAmountDue = Math.max(0, order.totalAmount - newAmountPaid);
+
+          const payCount = await tx.payment.count();
+          const paymentNumber = generateCode('PAY', payCount + 1);
+          const receiptNumber = generateCode('RCT', payCount + 1);
+
+          await tx.payment.create({
+            data: {
+              paymentNumber,
+              receiptNumber,
+              orderId: order.id,
+              customerId: order.customerId,
+              amount: partialAmount,
+              method: method || 'CASH',
+              referenceNumber: referenceNumber || null,
+              receivedById: userId,
+              notes: notes || 'Partial payment recorded',
+              paymentDate: new Date()
+            }
+          });
+        }
+      } else if (targetStatus === 'UNPAID') {
+        // Just mark as UNPAID
       }
+
+      const orderUpdated = await tx.order.update({
+        where: { id },
+        data: {
+          paymentStatus: targetStatus,
+          amountPaid: newAmountPaid,
+          amountDue: newAmountDue
+        },
+        include: {
+          customer: true,
+          payments: true
+        }
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: 'PAYMENT_STATUS_UPDATE',
+          entityType: 'ORDER',
+          entityId: order.id,
+          details: `Payment status updated from ${order.paymentStatus} to ${targetStatus}`
+        }
+      });
+
+      return orderUpdated;
     });
 
     res.json({ success: true, order: updated });
