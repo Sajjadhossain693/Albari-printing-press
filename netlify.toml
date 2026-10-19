@@ -1,0 +1,12 @@
+[build]
+  # The server (Express + Prisma/SQLite) cannot run on Netlify's static hosting,
+  # so only the React client is built and published. Its dependencies live in
+  # client/package.json, which Netlify's root `npm install` does not install.
+  command = "npm ci --prefix client --include=dev && npm run build --prefix client"
+  publish = "client/dist"
+
+# Single-page app fallback for React Router routes like /storefront and /track
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
